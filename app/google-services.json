@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "493758735833",
+    "project_id": "queuenow-93295",
+    "storage_bucket": "queuenow-93295.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:493758735833:android:17262d0a426d48448aa5c8",
+        "android_client_info": {
+          "package_name": "com.example.queuenow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAO-0tUaUflTGQ-M5L63tw-IpCB8p-rotc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
