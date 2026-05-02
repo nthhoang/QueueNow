@@ -2,10 +2,13 @@ package com.example.queuenow.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.queuenow.ui.admin.*
 import com.example.queuenow.ui.auth.*
+import com.example.queuenow.ui.chat.*
 import com.example.queuenow.ui.notification.NotificationScreen
 import com.example.queuenow.ui.owner.dashboard.OwnerDashboardScreen
 import com.example.queuenow.ui.owner.payment.PaymentConfirmScreen
@@ -27,96 +30,103 @@ fun AppNavGraph(
     NavHost(navController = navController, startDestination = startDestination) {
 
         // ── Auth ──────────────────────────────────────────────────────────────
-        composable(Screen.Login.route) {
-            LoginScreen(navController)
-        }
-        composable(Screen.Register.route) {
-            RegisterScreen(navController)
-        }
+        composable(Screen.Login.route)    { LoginScreen(navController) }
+        composable(Screen.Register.route) { RegisterScreen(navController) }
 
         // ── User ──────────────────────────────────────────────────────────────
-        composable(Screen.Home.route) {
-            HomeScreen(navController)
-        }
+        composable(Screen.Home.route)         { HomeScreen(navController) }
+        composable(Screen.TicketHistory.route){ TicketHistoryScreen(navController) }
+        composable(Screen.Profile.route)      { ProfileScreen(navController) }
+        composable(Screen.OwnerRequestScreen.route) { OwnerRequestScreen(navController) }
+        composable(Screen.UserChatList.route) { UserChatListScreen(navController) }
+
         composable(Screen.PlaceDetail.route) { back ->
-            val placeId = back.arguments?.getString("placeId") ?: ""
-            PlaceDetailScreen(navController, placeId)
+            PlaceDetailScreen(navController, back.arguments?.getString("placeId") ?: "")
         }
         composable(Screen.TakeTicket.route) { back ->
-            val placeId = back.arguments?.getString("placeId") ?: ""
-            val roomId  = back.arguments?.getString("roomId")  ?: ""
-            TakeTicketScreen(navController, placeId, roomId)
+            TakeTicketScreen(
+                navController,
+                back.arguments?.getString("placeId") ?: "",
+                back.arguments?.getString("roomId")  ?: ""
+            )
         }
         composable(Screen.QueueStatus.route) { back ->
-            val ticketId = back.arguments?.getString("ticketId") ?: ""
-            QueueStatusScreen(navController, ticketId)
-        }
-        composable(Screen.TicketHistory.route) {
-            TicketHistoryScreen(navController)
-        }
-        composable(Screen.Profile.route) {
-            ProfileScreen(navController)
-        }
-        composable(Screen.OwnerRequestScreen.route) {
-            OwnerRequestScreen(navController)
+            QueueStatusScreen(navController, back.arguments?.getString("ticketId") ?: "")
         }
         composable(Screen.ReviewScreen.route) { back ->
-            val ticketId = back.arguments?.getString("ticketId") ?: ""
-            val placeId  = back.arguments?.getString("placeId")  ?: ""
-            ReviewScreen(navController, ticketId, placeId)
+            ReviewScreen(
+                navController,
+                back.arguments?.getString("ticketId") ?: "",
+                back.arguments?.getString("placeId")  ?: ""
+            )
+        }
+
+        // ── Chat — hỗ trợ 2 cách navigate ────────────────────────────────────
+        // Cách 1: dùng chatRoomId (từ ChatList)
+        // Route: "chat/{chatRoomId}"
+        composable(
+            route = "chat/{chatRoomId}",
+            arguments = listOf(navArgument("chatRoomId") { type = NavType.StringType })
+        ) { back ->
+            val chatRoomId = back.arguments?.getString("chatRoomId") ?: ""
+            ChatScreen(navController = navController, chatRoomId = chatRoomId)
+        }
+
+        // Cách 2: dùng placeId + ownerId (từ PlaceDetailScreen)
+        // Route: "chat_new?placeId={placeId}&ownerId={ownerId}"
+        composable(
+            route = "chat_new?placeId={placeId}&ownerId={ownerId}",
+            arguments = listOf(
+                navArgument("placeId") { type = NavType.StringType; defaultValue = "" },
+                navArgument("ownerId") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) { back ->
+            ChatScreen(
+                navController = navController,
+                placeId       = back.arguments?.getString("placeId") ?: "",
+                ownerId       = back.arguments?.getString("ownerId") ?: ""
+            )
         }
 
         // ── Owner ─────────────────────────────────────────────────────────────
-        composable(Screen.OwnerDashboard.route) {
-            OwnerDashboardScreen(navController)
-        }
-        composable(Screen.ManagePlace.route) {
-            ManagePlaceScreen(navController)
-        }
+        composable(Screen.OwnerDashboard.route)  { OwnerDashboardScreen(navController) }
+        composable(Screen.ManagePlace.route)     { ManagePlaceScreen(navController) }
+        composable(Screen.OwnerChatList.route)   { OwnerChatListScreen(navController) }
+
         composable(Screen.EditPlace.route) { back ->
-            val placeId = back.arguments?.getString("placeId") ?: "new"
-            EditPlaceScreen(navController, placeId)
+            EditPlaceScreen(navController, back.arguments?.getString("placeId") ?: "new")
         }
         composable(Screen.ManageRoom.route) { back ->
-            val placeId = back.arguments?.getString("placeId") ?: ""
-            ManageRoomScreen(navController, placeId)
+            ManageRoomScreen(navController, back.arguments?.getString("placeId") ?: "")
         }
         composable(Screen.EditRoom.route) { back ->
-            val placeId = back.arguments?.getString("placeId") ?: ""
-            val roomId  = back.arguments?.getString("roomId")  ?: "new"
-            EditRoomScreen(navController, placeId, roomId)
+            EditRoomScreen(
+                navController,
+                back.arguments?.getString("placeId") ?: "",
+                back.arguments?.getString("roomId")  ?: "new"
+            )
         }
         composable(Screen.LiveQueue.route) { back ->
-            val placeId = back.arguments?.getString("placeId") ?: ""
-            val roomId  = back.arguments?.getString("roomId")  ?: ""
-            LiveQueueScreen(navController, placeId, roomId)
+            LiveQueueScreen(
+                navController,
+                back.arguments?.getString("placeId") ?: "",
+                back.arguments?.getString("roomId")  ?: ""
+            )
         }
         composable(Screen.PaymentConfirm.route) { back ->
-            val placeId = back.arguments?.getString("placeId") ?: ""
-            PaymentConfirmScreen(navController, placeId)
+            PaymentConfirmScreen(navController, back.arguments?.getString("placeId") ?: "")
         }
         composable(Screen.OwnerStats.route) { back ->
-            val placeId = back.arguments?.getString("placeId") ?: ""
-            OwnerStatsScreen(navController, placeId)
+            OwnerStatsScreen(navController, back.arguments?.getString("placeId") ?: "")
         }
 
         // ── Admin ─────────────────────────────────────────────────────────────
-        composable(Screen.AdminDashboard.route) {
-            AdminDashboardScreen(navController)
-        }
-        composable(Screen.ManageAccounts.route) {
-            ManageAccountsScreen(navController)
-        }
-        composable(Screen.ManagePlacesAdmin.route) {
-            ManagePlacesAdminScreen(navController)
-        }
-        composable(Screen.OwnerRequestList.route) {
-            OwnerRequestListScreen(navController)
-        }
+        composable(Screen.AdminDashboard.route)    { AdminDashboardScreen(navController) }
+        composable(Screen.ManageAccounts.route)    { ManageAccountsScreen(navController) }
+        composable(Screen.ManagePlacesAdmin.route) { ManagePlacesAdminScreen(navController) }
+        composable(Screen.OwnerRequestList.route)  { OwnerRequestListScreen(navController) }
 
         // ── Shared ────────────────────────────────────────────────────────────
-        composable(Screen.Notifications.route) {
-            NotificationScreen(navController)
-        }
+        composable(Screen.Notifications.route) { NotificationScreen(navController) }
     }
 }

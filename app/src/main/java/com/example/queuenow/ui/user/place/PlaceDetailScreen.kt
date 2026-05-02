@@ -152,6 +152,25 @@ fun PlaceDetailScreen(
                             Text(place.description, style = MaterialTheme.typography.bodyMedium,
                                 color = TextSecondary)
                         }
+                        // ── Nút Nhắn tin ─────────────────────────────────────────────────────────
+                        Spacer(Modifier.height(14.dp))
+                        HorizontalDivider(color = Divider)
+                        Spacer(Modifier.height(12.dp))
+
+                        Button(
+                            onClick = {
+                                navController.navigate(
+                                    "chat_new?placeId=${placeId}&ownerId=${place.ownerId}"
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors   = ButtonDefaults.buttonColors(containerColor = Primary),
+                            shape    = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Filled.Chat, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Nhắn tin với chủ địa điểm", fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }

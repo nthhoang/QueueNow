@@ -140,26 +140,28 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 fun UserBottomNav(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
     NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
         listOf(
-            Triple(Screen.Home.route, Icons.Filled.Home, "Trang chủ"),
+            Triple(Screen.Home.route,        Icons.Filled.Home,               "Trang chủ"),
             Triple(Screen.TicketHistory.route, Icons.Filled.ConfirmationNumber, "Vé của tôi"),
-            Triple(Screen.Profile.route, Icons.Filled.Person, "Hồ sơ")
+            Triple(Screen.UserChatList.route, Icons.Filled.Chat,              "Nhắn tin"),
+            Triple(Screen.Profile.route,     Icons.Filled.Person,             "Hồ sơ")
         ).forEach { (route, icon, label) ->
             NavigationBarItem(
-                icon = { Icon(icon, contentDescription = label) },
-                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                icon     = { Icon(icon, contentDescription = label) },
+                label    = { Text(label, style = MaterialTheme.typography.labelSmall) },
                 selected = currentRoute == route,
-                onClick = {
+                onClick  = {
                     if (currentRoute != route) navController.navigate(route) {
                         popUpTo(Screen.Home.route) { saveState = true }
                         launchSingleTop = true; restoreState = true
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Primary, selectedTextColor = Primary,
+                    selectedIconColor   = Primary, selectedTextColor   = Primary,
                     unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
-                    indicatorColor = PrimaryLight
+                    indicatorColor      = PrimaryLight
                 )
             )
         }
@@ -170,26 +172,28 @@ fun UserBottomNav(navController: NavController) {
 fun OwnerBottomNav(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
     NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
         listOf(
-            Triple(Screen.OwnerDashboard.route, Icons.Filled.Dashboard, "Tổng quan"),
-            Triple(Screen.ManagePlace.route, Icons.Filled.Store, "Địa điểm"),
-            Triple(Screen.Profile.route, Icons.Filled.Person, "Hồ sơ")
+            Triple(Screen.OwnerDashboard.route, Icons.Filled.Dashboard,  "Tổng quan"),
+            Triple(Screen.ManagePlace.route,    Icons.Filled.Store,      "Địa điểm"),
+            Triple(Screen.OwnerChatList.route,  Icons.Filled.Chat,       "Nhắn tin"),
+            Triple(Screen.Profile.route,        Icons.Filled.Person,     "Hồ sơ")
         ).forEach { (route, icon, label) ->
             NavigationBarItem(
-                icon = { Icon(icon, contentDescription = label) },
-                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                icon     = { Icon(icon, contentDescription = label) },
+                label    = { Text(label, style = MaterialTheme.typography.labelSmall) },
                 selected = currentRoute == route,
-                onClick = {
+                onClick  = {
                     if (currentRoute != route) navController.navigate(route) {
                         popUpTo(Screen.OwnerDashboard.route) { saveState = true }
                         launchSingleTop = true; restoreState = true
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Primary, selectedTextColor = Primary,
+                    selectedIconColor   = Primary, selectedTextColor   = Primary,
                     unselectedIconColor = TextSecondary, unselectedTextColor = TextSecondary,
-                    indicatorColor = PrimaryLight
+                    indicatorColor      = PrimaryLight
                 )
             )
         }
