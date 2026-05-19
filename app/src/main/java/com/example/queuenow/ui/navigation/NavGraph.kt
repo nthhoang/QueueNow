@@ -87,6 +87,17 @@ fun AppNavGraph(
                 ownerId       = back.arguments?.getString("ownerId") ?: ""
             )
         }
+        
+        // ── AI Chatbot ────────────────────────────────────────────────────────
+        composable(
+            route = Screen.AiChat.route,
+            arguments = listOf(navArgument("placeId") { type = NavType.StringType })
+        ) { back ->
+            AiChatScreen(
+                navController = navController,
+                placeId = back.arguments?.getString("placeId") ?: ""
+            )
+        }
 
         // ── Owner ─────────────────────────────────────────────────────────────
         composable(Screen.OwnerDashboard.route)  { OwnerDashboardScreen(navController) }

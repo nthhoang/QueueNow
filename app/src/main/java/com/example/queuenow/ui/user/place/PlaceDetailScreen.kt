@@ -152,24 +152,47 @@ fun PlaceDetailScreen(
                             Text(place.description, style = MaterialTheme.typography.bodyMedium,
                                 color = TextSecondary)
                         }
-                        // ── Nút Nhắn tin ─────────────────────────────────────────────────────────
+                        
+                        // ── Buttons ──────────────────────────────────────────────────────────────
                         Spacer(Modifier.height(14.dp))
                         HorizontalDivider(color = Divider)
                         Spacer(Modifier.height(12.dp))
 
-                        Button(
-                            onClick = {
-                                navController.navigate(
-                                    "chat_new?placeId=${placeId}&ownerId=${place.ownerId}"
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors   = ButtonDefaults.buttonColors(containerColor = Primary),
-                            shape    = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Filled.Chat, null, modifier = Modifier.size(18.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            // Nút Hỏi AI
+                            Button(
+                                onClick = {
+                                    navController.navigate(Screen.AiChat.createRoute(placeId))
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF673AB7)), // Màu tím đặc trưng AI
+                                shape    = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(vertical = 12.dp)
+                            ) {
+                                Icon(Icons.Filled.AutoAwesome, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Hỏi AI", fontWeight = FontWeight.SemiBold)
+                            }
+                            
                             Spacer(Modifier.width(8.dp))
-                            Text("Nhắn tin với chủ địa điểm", fontWeight = FontWeight.SemiBold)
+                            
+                            // Nút Nhắn tin
+                            OutlinedButton(
+                                onClick = {
+                                    navController.navigate(
+                                        "chat_new?placeId=${placeId}&ownerId=${place.ownerId}"
+                                    )
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors   = ButtonDefaults.outlinedButtonColors(contentColor = Primary),
+                                border   = ButtonDefaults.outlinedButtonBorder.copy(brush = Brush.linearGradient(listOf(Primary, Primary))),
+                                shape    = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(vertical = 12.dp)
+                            ) {
+                                Icon(Icons.Filled.Chat, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Nhắn tin", fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }

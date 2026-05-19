@@ -31,7 +31,6 @@ android {
 }
 
 dependencies {
-    // Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -42,7 +41,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
-    // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // Firebase
@@ -52,44 +50,31 @@ dependencies {
     implementation("com.google.firebase:firebase-database-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
 
-    // Cloudinary
+    // Google Play Services
+    implementation("com.google.android.gms:play-services-basement:18.4.0")
+    implementation("com.google.android.gms:play-services-base:18.5.0")
+
     implementation("com.cloudinary:cloudinary-android:2.3.1")
-
-    // Coil (hiển thị ảnh)
     implementation("io.coil-kt:coil-compose:2.6.0")
-
-    // QR Code
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
-
-    // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-
-    // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
-
-    // Icons Extended
     implementation("androidx.compose.material:material-icons-extended:1.6.7")
-
-
-    // Splash Screen
     implementation("androidx.core:core-splashscreen:1.0.1")
-
-    // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // Camera + ML Kit
     implementation("androidx.camera:camera-camera2:1.3.1")
     implementation("androidx.camera:camera-lifecycle:1.3.1")
     implementation("androidx.camera:camera-view:1.3.1")
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
-    // Permission
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+
+    // Gemini AI - Nâng cấp lên bản hỗ trợ tốt nhất cho Gemini 2.0
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 }
-// đọc trong gpt phần giải thích thêm thư viện

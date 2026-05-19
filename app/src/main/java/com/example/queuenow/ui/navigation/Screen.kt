@@ -30,6 +30,11 @@ sealed class Screen(val route: String) {
     object UserChatList : Screen("user_chat_list")
     /** Danh sách hội thoại của owner */
     object OwnerChatList : Screen("owner_chat_list")
+    
+    /** Chatbot AI trợ giúp thông tin */
+    object AiChat : Screen("ai_chat/{placeId}") {
+        fun createRoute(placeId: String) = "ai_chat/$placeId"
+    }
 
     // ── Owner ────────────────────────────────────────────────────────────────
     object OwnerDashboard : Screen("owner_dashboard")
