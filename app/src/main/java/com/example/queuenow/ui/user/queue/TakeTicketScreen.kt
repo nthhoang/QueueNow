@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -18,6 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.queuenow.data.model.WaitingRoom
@@ -36,7 +40,24 @@ fun TakeTicketScreen(
         factory = TakeTicketViewModel.factory(placeId, roomId)
     )
 ) {
-    val state by vm.state.collectAsState()
+    val state          by vm.state.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // ── FIX: Flag chỉ reload khi user THỰC SỰ quay lại từ QrScanScreen ──────
+    // Không dùng DisposableEffect trong NeedQrScanView để tránh loop
+    var didNavigateToQrScan by rememberSaveable { mutableStateOf(false) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && didNavigateToQrScan) {
+                didNavigateToQrScan = false
+                vm.loadInitialState()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     // Điều hướng khi tạo vé thành công
     LaunchedEffect(state.mode) {
@@ -58,7 +79,7 @@ fun TakeTicketScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
+                    containerColor    = Color.White,
                     titleContentColor = OnBackground
                 )
             )
@@ -71,6 +92,7 @@ fun TakeTicketScreen(
                 .padding(padding)
         ) {
             when (val mode = state.mode) {
+
                 // ── Loading ──────────────────────────────────────────────
                 is TakeTicketUiMode.Loading -> {
                     Box(
@@ -79,10 +101,22 @@ fun TakeTicketScreen(
                     ) { CircularProgressIndicator(color = Primary) }
                 }
 
+                // ── Yêu cầu quét QR ─────────────────────────────────────
+                is TakeTicketUiMode.NeedQrScan -> {
+                    NeedQrScanView(
+                        mode          = mode,
+                        placeId       = placeId,
+                        roomId        = roomId,
+                        navController = navController,
+                        // Set flag TRƯỚC khi navigate — ON_RESUME ở trên sẽ reload
+                        onNavigateToScan = { didNavigateToQrScan = true }
+                    )
+                }
+
                 // ── Có thể lấy số ───────────────────────────────────────
                 is TakeTicketUiMode.CanTake -> {
                     CanTakeContent(
-                        mode = mode,
+                        mode         = mode,
                         isSubmitting = state.isSubmitting,
                         onTakeTicket = { vm.takeTicket() }
                     )
@@ -91,7 +125,7 @@ fun TakeTicketScreen(
                 // ── Chờ xác nhận thanh toán ─────────────────────────────
                 is TakeTicketUiMode.PendingPayment -> {
                     PendingPaymentContent(
-                        mode = mode,
+                        mode        = mode,
                         onViewStatus = {
                             navController.navigate(
                                 Screen.QueueStatus.createRoute(mode.ticket.ticketId)
@@ -107,7 +141,7 @@ fun TakeTicketScreen(
                 // ── Đã trong hàng đợi ───────────────────────────────────
                 is TakeTicketUiMode.AlreadyInQueue -> {
                     AlreadyInQueueContent(
-                        mode = mode,
+                        mode         = mode,
                         onViewStatus = {
                             navController.navigate(
                                 Screen.QueueStatus.createRoute(mode.ticket.ticketId)
@@ -131,21 +165,21 @@ fun TakeTicketScreen(
                     ) {
                         Icon(
                             Icons.Filled.ErrorOutline, null,
-                            tint = StatusCanceled,
+                            tint     = StatusCanceled,
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(
                             mode.message,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = TextSecondary,
+                            style     = MaterialTheme.typography.bodyLarge,
+                            color     = TextSecondary,
                             textAlign = TextAlign.Center
                         )
                         Spacer(Modifier.height(20.dp))
                         Button(
                             onClick = { vm.clearError() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                            shape = RoundedCornerShape(12.dp)
+                            colors  = ButtonDefaults.buttonColors(containerColor = Primary),
+                            shape   = RoundedCornerShape(12.dp)
                         ) { Text("Thử lại") }
                     }
                 }
@@ -160,7 +194,131 @@ fun TakeTicketScreen(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// CAN TAKE — Form lấy số
+// NEED QR SCAN — Yêu cầu quét mã QR
+// ── FIX: KHÔNG có DisposableEffect lifecycle — tránh vòng lặp vô hạn ────────
+// ────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun NeedQrScanView(
+    mode: TakeTicketUiMode.NeedQrScan,
+    placeId: String,
+    roomId: String,
+    navController: NavController,
+    onNavigateToScan: () -> Unit   // ← callback set flag ở TakeTicketScreen
+) {
+    Column(
+        modifier            = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Surface(
+            shape    = RoundedCornerShape(20.dp),
+            color    = PrimaryLight,
+            modifier = Modifier.size(100.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.QrCodeScanner, null,
+                    tint     = Primary,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Text(
+            "Xác thực vị trí",
+            style      = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            mode.place?.placeName ?: "",
+            style      = MaterialTheme.typography.titleMedium,
+            color      = Primary,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            mode.room.roomName,
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        Card(
+            modifier  = Modifier.fillMaxWidth(),
+            shape     = RoundedCornerShape(16.dp),
+            colors    = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(2.dp)
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.LocationOn, null,
+                        tint     = Primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Yêu cầu có mặt tại địa điểm",
+                        fontWeight = FontWeight.Bold,
+                        color      = OnBackground
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Phòng chờ này yêu cầu bạn phải đến trực tiếp địa điểm để lấy số.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Hãy đến quầy lễ tân, quét mã QR để xác thực và lấy số thứ tự.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Button(
+            onClick = {
+                onNavigateToScan()   // ← set flag TRƯỚC
+                navController.navigate(Screen.QrScan.createRoute(placeId, roomId))
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Primary),
+            shape  = RoundedCornerShape(16.dp)
+        ) {
+            Icon(
+                Icons.Filled.QrCodeScanner, null,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "Quét mã QR để tiếp tục",
+                style      = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        TextButton(onClick = { navController.popBackStack() }) {
+            Text("Quay lại", color = TextSecondary)
+        }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// CAN TAKE — Form lấy số (giữ nguyên UI cũ)
 // ────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun CanTakeContent(
@@ -177,23 +335,21 @@ private fun CanTakeContent(
     ) {
         // ── Hero card: hiển thị số sẽ nhận ─────────────────────────────
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            modifier  = Modifier.fillMaxWidth(),
+            shape     = RoundedCornerShape(24.dp),
             elevation = CardDefaults.cardElevation(6.dp)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        Brush.horizontalGradient(listOf(GradientStart, GradientEnd))
-                    )
+                    .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd)))
                     .padding(28.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
                         Icons.Filled.ConfirmationNumber, null,
-                        tint = Color.White,
+                        tint     = Color.White,
                         modifier = Modifier.size(44.dp)
                     )
                     Spacer(Modifier.height(10.dp))
@@ -204,34 +360,30 @@ private fun CanTakeContent(
                     )
                     Text(
                         String.format("%03d", mode.myPosition),
-                        fontSize = 64.sp,
+                        fontSize   = 64.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
+                        color      = Color.White
                     )
                     Spacer(Modifier.height(4.dp))
-                    // Badge hiển thị số người chờ
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = Color.White.copy(alpha = 0.25f)
                     ) {
                         Row(
-                            modifier = Modifier.padding(
-                                horizontal = 16.dp,
-                                vertical = 6.dp
-                            ),
+                            modifier          = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 Icons.Filled.People, null,
-                                tint = Color.White,
+                                tint     = Color.White,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 if (mode.waitingCount == 0) "Chưa có ai chờ"
                                 else "${mode.waitingCount} người đang chờ trước bạn",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White,
+                                style      = MaterialTheme.typography.bodySmall,
+                                color      = Color.White,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -242,10 +394,8 @@ private fun CanTakeContent(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Thông tin phòng ─────────────────────────────────────────────
         InfoCard(room = mode.room, place = mode.place)
 
-        // ── Cảnh báo thanh toán ─────────────────────────────────────────
         if (mode.room.prepaymentRequired) {
             Spacer(Modifier.height(12.dp))
             PrepaymentWarningCard(amount = mode.room.prepaymentAmount)
@@ -254,7 +404,7 @@ private fun CanTakeContent(
         Spacer(Modifier.height(24.dp))
 
         GradientButton(
-            text = if (isSubmitting) "Đang xử lý..." else "Xác nhận lấy số",
+            text    = if (isSubmitting) "Đang xử lý..." else "Xác nhận lấy số",
             onClick = onTakeTicket,
             enabled = !isSubmitting,
             modifier = Modifier.fillMaxWidth()
@@ -263,8 +413,8 @@ private fun CanTakeContent(
         Spacer(Modifier.height(10.dp))
         Text(
             "Vé sẽ được cấp ngay sau khi xác nhận",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
+            style     = MaterialTheme.typography.bodySmall,
+            color     = TextSecondary,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(24.dp))
@@ -272,7 +422,7 @@ private fun CanTakeContent(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// PENDING PAYMENT — Chờ xác nhận thanh toán
+// PENDING PAYMENT (giữ nguyên UI cũ)
 // ────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun PendingPaymentContent(
@@ -286,10 +436,9 @@ private fun PendingPaymentContent(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ── Hero card ───────────────────────────────────────────────────
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            modifier  = Modifier.fillMaxWidth(),
+            shape     = RoundedCornerShape(24.dp),
             elevation = CardDefaults.cardElevation(6.dp)
         ) {
             Column(
@@ -305,7 +454,7 @@ private fun PendingPaymentContent(
             ) {
                 Icon(
                     Icons.Filled.HourglassTop, null,
-                    tint = Color.White,
+                    tint     = Color.White,
                     modifier = Modifier.size(48.dp)
                 )
                 Spacer(Modifier.height(12.dp))
@@ -316,9 +465,9 @@ private fun PendingPaymentContent(
                 )
                 Text(
                     mode.ticket.ticketNumber,
-                    fontSize = 64.sp,
+                    fontSize   = 64.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
+                    color      = Color.White
                 )
                 Surface(
                     shape = RoundedCornerShape(20.dp),
@@ -326,12 +475,9 @@ private fun PendingPaymentContent(
                 ) {
                     Text(
                         "⏳ Chờ xác nhận thanh toán",
-                        modifier = Modifier.padding(
-                            horizontal = 16.dp,
-                            vertical = 6.dp
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White,
+                        modifier   = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        style      = MaterialTheme.typography.bodyMedium,
+                        color      = Color.White,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -340,11 +486,10 @@ private fun PendingPaymentContent(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Thông báo ───────────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
+            shape    = RoundedCornerShape(20.dp),
+            colors   = CardDefaults.cardColors(
                 containerColor = StatusCalled.copy(alpha = 0.08f)
             ),
             border = androidx.compose.foundation.BorderStroke(
@@ -355,15 +500,15 @@ private fun PendingPaymentContent(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Filled.Info, null,
-                        tint = StatusCalled,
+                        tint     = StatusCalled,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         "Vé chưa vào hàng đợi",
-                        style = MaterialTheme.typography.titleMedium,
+                        style      = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = StatusCalled
+                        color      = StatusCalled
                     )
                 }
                 Spacer(Modifier.height(8.dp))
@@ -379,7 +524,7 @@ private fun PendingPaymentContent(
                     HorizontalDivider(color = Divider)
                     Spacer(Modifier.height(10.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier              = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
@@ -389,9 +534,9 @@ private fun PendingPaymentContent(
                         )
                         Text(
                             "${String.format("%,.0f", payment.amount)} VNĐ",
-                            style = MaterialTheme.typography.titleMedium,
+                            style      = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Secondary
+                            color      = Secondary
                         )
                     }
 
@@ -402,7 +547,7 @@ private fun PendingPaymentContent(
                             if (proofSent) Icons.Filled.CheckCircle
                             else Icons.Filled.RadioButtonUnchecked,
                             null,
-                            tint = if (proofSent) StatusCompleted else TextSecondary,
+                            tint     = if (proofSent) StatusCompleted else TextSecondary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(6.dp))
@@ -420,21 +565,18 @@ private fun PendingPaymentContent(
         Spacer(Modifier.height(20.dp))
 
         Button(
-            onClick = onViewStatus,
+            onClick  = onViewStatus,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
             colors = ButtonDefaults.buttonColors(containerColor = StatusCalled),
-            shape = RoundedCornerShape(16.dp)
+            shape  = RoundedCornerShape(16.dp)
         ) {
-            Icon(
-                Icons.Filled.Payment, null,
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(Icons.Filled.Payment, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text(
                 "Xem vé & Upload thanh toán",
-                style = MaterialTheme.typography.labelLarge,
+                style      = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -443,7 +585,7 @@ private fun PendingPaymentContent(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// ALREADY IN QUEUE — Đã trong hàng đợi
+// ALREADY IN QUEUE (giữ nguyên UI cũ)
 // ────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun AlreadyInQueueContent(
@@ -457,18 +599,15 @@ private fun AlreadyInQueueContent(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ── Hero card: số của mình ──────────────────────────────────────
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            modifier  = Modifier.fillMaxWidth(),
+            shape     = RoundedCornerShape(24.dp),
             elevation = CardDefaults.cardElevation(6.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        Brush.horizontalGradient(listOf(GradientStart, GradientEnd))
-                    )
+                    .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd)))
                     .padding(28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -479,9 +618,9 @@ private fun AlreadyInQueueContent(
                 )
                 Text(
                     mode.ticket.ticketNumber,
-                    fontSize = 72.sp,
+                    fontSize   = 72.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
+                    color      = Color.White
                 )
                 Surface(
                     shape = RoundedCornerShape(20.dp),
@@ -489,12 +628,9 @@ private fun AlreadyInQueueContent(
                 ) {
                     Text(
                         "✅ Đang trong hàng đợi",
-                        modifier = Modifier.padding(
-                            horizontal = 16.dp,
-                            vertical = 6.dp
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White,
+                        modifier   = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        style      = MaterialTheme.typography.bodyMedium,
+                        color      = Color.White,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -503,53 +639,38 @@ private fun AlreadyInQueueContent(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Thông tin hàng đợi ──────────────────────────────────────────
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier  = Modifier.fillMaxWidth(),
+            shape     = RoundedCornerShape(20.dp),
+            colors    = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(3.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
                     "Trạng thái hàng đợi",
-                    style = MaterialTheme.typography.titleLarge,
+                    style      = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // Số đang được phục vụ
                 QueueInfoRow(
                     icon       = Icons.Filled.PlayCircle,
                     label      = "Đang phục vụ số",
                     value      = mode.currentCalledNumber,
-                    valueColor = if (mode.currentCalledNumber == "---")
-                        TextSecondary else StatusCalled,
+                    valueColor = if (mode.currentCalledNumber == "---") TextSecondary else StatusCalled,
                     highlight  = mode.currentCalledNumber != "---"
                 )
+                HorizontalDivider(color = Divider, modifier = Modifier.padding(vertical = 10.dp))
 
-                HorizontalDivider(
-                    color = Divider,
-                    modifier = Modifier.padding(vertical = 10.dp)
-                )
-
-                // Số người đang chờ trước mình
                 QueueInfoRow(
                     icon       = Icons.Filled.People,
                     label      = "Người chờ trước bạn",
-                    value      = if (mode.aheadCount == 0) "Không có"
-                    else "${mode.aheadCount} người",
-                    valueColor = if (mode.aheadCount == 0) StatusCompleted
-                    else StatusWaiting,
+                    value      = if (mode.aheadCount == 0) "Không có" else "${mode.aheadCount} người",
+                    valueColor = if (mode.aheadCount == 0) StatusCompleted else StatusWaiting,
                     highlight  = mode.aheadCount == 0
                 )
+                HorizontalDivider(color = Divider, modifier = Modifier.padding(vertical = 10.dp))
 
-                HorizontalDivider(
-                    color = Divider,
-                    modifier = Modifier.padding(vertical = 10.dp)
-                )
-
-                // Tổng người đang chờ
                 QueueInfoRow(
                     icon       = Icons.Filled.Queue,
                     label      = "Tổng số đang chờ",
@@ -557,13 +678,8 @@ private fun AlreadyInQueueContent(
                     valueColor = TextSecondary,
                     highlight  = false
                 )
+                HorizontalDivider(color = Divider, modifier = Modifier.padding(vertical = 10.dp))
 
-                HorizontalDivider(
-                    color = Divider,
-                    modifier = Modifier.padding(vertical = 10.dp)
-                )
-
-                // Phòng
                 QueueInfoRow(
                     icon       = Icons.Filled.MeetingRoom,
                     label      = "Phòng chờ",
@@ -572,12 +688,8 @@ private fun AlreadyInQueueContent(
                     highlight  = false
                 )
 
-                // Địa điểm
                 mode.place?.let {
-                    HorizontalDivider(
-                        color = Divider,
-                        modifier = Modifier.padding(vertical = 10.dp)
-                    )
+                    HorizontalDivider(color = Divider, modifier = Modifier.padding(vertical = 10.dp))
                     QueueInfoRow(
                         icon       = Icons.Filled.Store,
                         label      = "Địa điểm",
@@ -589,13 +701,12 @@ private fun AlreadyInQueueContent(
             }
         }
 
-        // Banner nếu sắp đến lượt
         if (mode.aheadCount == 0 && mode.currentCalledNumber != "---") {
             Spacer(Modifier.height(12.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
+                shape    = RoundedCornerShape(16.dp),
+                colors   = CardDefaults.cardColors(
                     containerColor = StatusCompleted.copy(alpha = 0.1f)
                 ),
                 border = androidx.compose.foundation.BorderStroke(
@@ -603,19 +714,19 @@ private fun AlreadyInQueueContent(
                 )
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier          = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Filled.NotificationsActive, null,
-                        tint = StatusCompleted,
+                        tint     = StatusCompleted,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
                         "Gần đến lượt bạn! Hãy chuẩn bị sẵn sàng.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = StatusCompleted,
+                        style      = MaterialTheme.typography.bodyMedium,
+                        color      = StatusCompleted,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -625,18 +736,18 @@ private fun AlreadyInQueueContent(
         Spacer(Modifier.height(20.dp))
 
         Button(
-            onClick = onViewStatus,
+            onClick  = onViewStatus,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Primary),
-            shape = RoundedCornerShape(16.dp)
+            shape  = RoundedCornerShape(16.dp)
         ) {
             Icon(Icons.Filled.Visibility, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text(
                 "Xem vé của tôi",
-                style = MaterialTheme.typography.labelLarge,
+                style      = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -645,20 +756,20 @@ private fun AlreadyInQueueContent(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Shared components
+// Shared components (giữ nguyên hoàn toàn)
 // ────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun InfoCard(room: WaitingRoom, place: com.example.queuenow.data.model.Place?) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(20.dp),
+        colors    = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
                 "Thông tin hàng đợi",
-                style = MaterialTheme.typography.titleLarge,
+                style      = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(12.dp))
@@ -685,8 +796,8 @@ private fun InfoCard(room: WaitingRoom, place: com.example.queuenow.data.model.P
 private fun PrepaymentWarningCard(amount: Double) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
+        shape    = RoundedCornerShape(20.dp),
+        colors   = CardDefaults.cardColors(
             containerColor = Secondary.copy(alpha = 0.08f)
         ),
         border = androidx.compose.foundation.BorderStroke(
@@ -697,21 +808,21 @@ private fun PrepaymentWarningCard(amount: Double) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.Payment, null,
-                    tint = Secondary,
+                    tint     = Secondary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "Yêu cầu thanh toán trước",
-                    style = MaterialTheme.typography.titleMedium,
+                    style      = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Secondary
+                    color      = Secondary
                 )
             }
             Spacer(Modifier.height(8.dp))
             Text(
                 "Số tiền: ${String.format("%,.0f", amount)} VNĐ",
-                style = MaterialTheme.typography.bodyLarge,
+                style      = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(6.dp))
@@ -728,7 +839,7 @@ private fun PrepaymentWarningCard(amount: Double) {
 @Composable
 private fun TakeInfoRow(icon: ImageVector, label: String, value: String) {
     Row(
-        modifier = Modifier
+        modifier          = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.Top
@@ -736,16 +847,12 @@ private fun TakeInfoRow(icon: ImageVector, label: String, value: String) {
         Icon(icon, null, tint = Primary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(10.dp))
         Column {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary
-            )
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
             Text(
                 value,
-                style = MaterialTheme.typography.bodyMedium,
+                style      = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = OnBackground
+                color      = OnBackground
             )
         }
     }
@@ -760,24 +867,20 @@ private fun QueueInfoRow(
     highlight: Boolean
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment     = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = Primary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text(
-                label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
         }
         Text(
             value,
-            style = MaterialTheme.typography.titleMedium,
+            style      = MaterialTheme.typography.titleMedium,
             fontWeight = if (highlight) FontWeight.ExtraBold else FontWeight.SemiBold,
-            color = valueColor
+            color      = valueColor
         )
     }
 }

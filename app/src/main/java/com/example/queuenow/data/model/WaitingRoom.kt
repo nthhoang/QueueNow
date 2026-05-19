@@ -16,5 +16,6 @@ data class WaitingRoom(
     val prepaymentRequired: Boolean = false,
     val prepaymentAmount: Double = 0.0,
     val status: String = RoomStatus.CLOSED.name,
-    val lastResetTime: Long = 0L
+    val lastResetTime: Long = 0L,
+    val requireQrScan: Boolean = false      // ← yêu cầu quét QR trước khi lấy số
 )

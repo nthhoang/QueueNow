@@ -8,6 +8,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 
 class PlaceRepository {
     private val db  = FirebaseFirestore.getInstance()
@@ -28,44 +29,29 @@ class PlaceRepository {
         awaitClose { listener.remove() }
     }
 
-    /**
-     * Lấy địa điểm theo ownerId — query server-side theo ownerId
-     * Không bị ảnh hưởng bởi cache hay session cũ
-     */
     fun getPlacesByOwner(ownerId: String): Flow<List<Place>> = callbackFlow {
-        if (ownerId.isBlank()) {
-            trySend(emptyList())
-            awaitClose {}
-            return@callbackFlow
-        }
-        // Query chặt: whereEqualTo ownerId = uid hiện tại
-        val listener = col
-            .whereEqualTo("ownerId", ownerId)
+        if (ownerId.isBlank()) { trySend(emptyList()); awaitClose {}; return@callbackFlow }
+        val listener = col.whereEqualTo("ownerId", ownerId)
             .addSnapshotListener { snap, error ->
                 if (error != null) {
-                    Log.e("PlaceRepo", "getPlacesByOwner($ownerId): ${error.message}")
+                    Log.e("PlaceRepo", "getPlacesByOwner: ${error.message}")
                     trySend(emptyList()); return@addSnapshotListener
                 }
-                val list = snap?.toObjects(Place::class.java)
-                    // Client-side double check
-                    ?.filter { it.ownerId == ownerId }
-                    ?.sortedByDescending { it.createdAt }
-                    ?: emptyList()
-                trySend(list)
+                trySend(
+                    snap?.toObjects(Place::class.java)
+                        ?.filter { it.ownerId == ownerId }
+                        ?.sortedByDescending { it.createdAt }
+                        ?: emptyList()
+                )
             }
         awaitClose { listener.remove() }
     }
 
     fun getAllPlaces(): Flow<List<Place>> = callbackFlow {
         val listener = col.addSnapshotListener { snap, error ->
-            if (error != null) {
-                Log.e("PlaceRepo", "getAllPlaces: ${error.message}")
-                trySend(emptyList()); return@addSnapshotListener
-            }
+            if (error != null) { trySend(emptyList()); return@addSnapshotListener }
             trySend(
-                snap?.toObjects(Place::class.java)
-                    ?.sortedByDescending { it.createdAt }
-                    ?: emptyList()
+                snap?.toObjects(Place::class.java)?.sortedByDescending { it.createdAt } ?: emptyList()
             )
         }
         awaitClose { listener.remove() }
@@ -77,7 +63,9 @@ class PlaceRepository {
     suspend fun savePlace(place: Place): String {
         return if (place.placeId.isEmpty()) {
             val ref = col.document()
-            ref.set(place.copy(placeId = ref.id)).await()
+            // Tự sinh qrSecret khi tạo mới
+            val secret = UUID.randomUUID().toString().replace("-", "")
+            ref.set(place.copy(placeId = ref.id, qrSecret = secret, qrSecretUpdatedAt = System.currentTimeMillis())).await()
             ref.id
         } else {
             col.document(place.placeId).set(place).await()
@@ -87,9 +75,7 @@ class PlaceRepository {
 
     suspend fun updateStatus(placeId: String, status: PlaceStatus) {
         val place = getPlace(placeId) ?: return
-        if (place.lockedByAdmin) {
-            throw Exception("Địa điểm đang bị Admin khóa, không thể thay đổi trạng thái")
-        }
+        if (place.lockedByAdmin) throw Exception("Địa điểm đang bị Admin khóa")
         col.document(placeId).update("status", status.name).await()
     }
 
@@ -109,5 +95,41 @@ class PlaceRepository {
         col.document(placeId).update(
             mapOf("ratingAverage" to average, "ratingCount" to count)
         ).await()
+    }
+
+    // ── QR Secret methods ─────────────────────────────────────────────────────
+
+    /**
+     * Tạo mới hoặc xoay vòng secret cho địa điểm
+     * Owner gọi khi muốn đổi QR code
+     */
+    suspend fun rotateQrSecret(placeId: String): String {
+        val newSecret = UUID.randomUUID().toString().replace("-", "")
+        col.document(placeId).update(
+            mapOf(
+                "qrSecret"          to newSecret,
+                "qrSecretUpdatedAt" to System.currentTimeMillis()
+            )
+        ).await()
+        return newSecret
+    }
+
+    /**
+     * Đảm bảo địa điểm có QR secret (gọi khi owner vào màn hình QR lần đầu)
+     */
+    suspend fun ensureQrSecret(placeId: String): String {
+        val place = getPlace(placeId) ?: return ""
+        if (place.qrSecret.isNotBlank()) return place.qrSecret
+        return rotateQrSecret(placeId)
+    }
+
+    /**
+     * Xác thực QR: kiểm tra placeId + secret có khớp trong Firestore không
+     * Trả về true nếu hợp lệ
+     */
+    suspend fun verifyQrCode(placeId: String, secret: String): Boolean {
+        if (placeId.isBlank() || secret.isBlank()) return false
+        val place = getPlace(placeId) ?: return false
+        return place.qrSecret == secret && !place.lockedByAdmin
     }
 }

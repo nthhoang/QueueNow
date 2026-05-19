@@ -183,6 +183,9 @@ fun ManagePlaceScreen(
                             },
                             onViewStats    = {
                                 navController.navigate(Screen.OwnerStats.createRoute(place.placeId))
+                            },
+                            onViewQr = {
+                                navController.navigate(Screen.PlaceQr.createRoute(place.placeId))
                             }
                         )
                     }
@@ -199,7 +202,8 @@ private fun OwnerPlaceManageCard(
     onManageRooms: () -> Unit,
     onToggleStatus: () -> Unit,
     onPayments: () -> Unit,
-    onViewStats: () -> Unit
+    onViewStats: () -> Unit,
+    onViewQr: () -> Unit
 ) {
     Card(
         modifier  = Modifier.fillMaxWidth(),
@@ -286,6 +290,16 @@ private fun OwnerPlaceManageCard(
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Icon(Icons.Filled.Edit, null, modifier = Modifier.size(16.dp))
+                }
+                OutlinedButton(
+                    onClick = onViewQr,
+                    modifier = Modifier.size(40.dp),
+                    shape    = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(0.dp),
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = Secondary),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, Secondary.copy(0.5f))
+                ) {
+                    Icon(Icons.Filled.QrCode, null, tint = Secondary, modifier = Modifier.size(18.dp))
                 }
             }
         }

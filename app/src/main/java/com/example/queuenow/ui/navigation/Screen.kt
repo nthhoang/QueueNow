@@ -61,4 +61,14 @@ sealed class Screen(val route: String) {
 
     // ── Shared ────────────────────────────────────────────────────────────────
     object Notifications : Screen("notifications")
+
+    /** Màn hình quét QR check-in (user) */
+    object QrScan : Screen("qr_scan/{placeId}/{roomId}") {
+        fun createRoute(placeId: String, roomId: String) = "qr_scan/$placeId/$roomId"
+    }
+
+    /** Màn hình xem QR của địa điểm (owner) */
+    object PlaceQr : Screen("place_qr/{placeId}") {
+        fun createRoute(placeId: String) = "place_qr/$placeId"
+    }
 }

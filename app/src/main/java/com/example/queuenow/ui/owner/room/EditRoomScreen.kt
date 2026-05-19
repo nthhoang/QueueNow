@@ -75,7 +75,7 @@ class EditRoomViewModel(
         roomName: String, roomType: String, locationNote: String,
         description: String, estimatedTime: Int,
         prepaymentRequired: Boolean, prepaymentAmount: Double,
-        isOpen: Boolean
+        isOpen: Boolean, requireQrScan: Boolean
     ) {
         viewModelScope.launch {
             if (roomName.isBlank()) {
@@ -94,7 +94,8 @@ class EditRoomViewModel(
                     estimatedServiceTime = estimatedTime,
                     prepaymentRequired = prepaymentRequired,
                     prepaymentAmount = prepaymentAmount,
-                    status = if (isOpen) RoomStatus.OPEN.name else RoomStatus.CLOSED.name
+                    status = if (isOpen) RoomStatus.OPEN.name else RoomStatus.CLOSED.name,
+                    requireQrScan = requireQrScan
                 )
                 repo.saveRoom(placeId, toSave)
                 _state.update { it.copy(savedSuccessfully = true, isSaving = false) }
@@ -128,6 +129,7 @@ fun EditRoomScreen(
     var prepayAmount     by remember { mutableStateOf("") }
     var isOpen           by remember { mutableStateOf(false) }
     var initialized      by remember { mutableStateOf(false) }
+    var requireQrScan    by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.room) {
         if (!initialized && state.room != null) {
@@ -140,6 +142,7 @@ fun EditRoomScreen(
                 prepayRequired = r.prepaymentRequired
                 prepayAmount  = if (r.prepaymentAmount > 0) r.prepaymentAmount.toInt().toString() else ""
                 isOpen        = r.status == RoomStatus.OPEN.name
+                requireQrScan = r.requireQrScan
             }
             initialized = true
         }
@@ -274,6 +277,43 @@ fun EditRoomScreen(
                     }
                 }
 
+                // Thêm Card toggle (sau prepayment card):
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape    = RoundedCornerShape(16.dp),
+                    colors   = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.QrCodeScanner, null,
+                                    tint = Primary, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Yêu cầu quét QR", fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "User phải đến địa điểm và quét mã QR mới lấy được số",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked  = requireQrScan,
+                            onCheckedChange = { requireQrScan = it },
+                            colors   = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Primary
+                            )
+                        )
+                    }
+                }
+
                 // ── Trạng thái ───────────────────────────────────────
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -300,7 +340,7 @@ fun EditRoomScreen(
                     text = if (state.isSaving) "Đang lưu..." else "Lưu phòng chờ",
                     onClick = {
                         val amount = prepayAmount.toDoubleOrNull() ?: 0.0
-                        vm.save(roomName, roomType, locationNote, description, estimatedTime, prepayRequired, amount, isOpen)
+                        vm.save(roomName, roomType, locationNote, description, estimatedTime, prepayRequired, amount, isOpen, requireQrScan)
                     },
                     enabled = !state.isSaving,
                     modifier = Modifier.fillMaxWidth()

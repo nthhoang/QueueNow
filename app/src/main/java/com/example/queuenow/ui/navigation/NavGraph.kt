@@ -128,5 +128,21 @@ fun AppNavGraph(
 
         // ── Shared ────────────────────────────────────────────────────────────
         composable(Screen.Notifications.route) { NotificationScreen(navController) }
+
+        // ── QR ────────────────────────────────────────────────────────────────
+        composable(Screen.QrScan.route) { back ->
+            QrScanScreen(
+                navController = navController,
+                placeId = back.arguments?.getString("placeId") ?: "",
+                roomId  = back.arguments?.getString("roomId")  ?: ""
+            )
+        }
+
+        composable(Screen.PlaceQr.route) { back ->
+            PlaceQrScreen(
+                navController = navController,
+                placeId = back.arguments?.getString("placeId") ?: ""
+            )
+        }
     }
 }
