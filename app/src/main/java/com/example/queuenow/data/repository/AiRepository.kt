@@ -1,6 +1,7 @@
 package com.example.queuenow.data.repository
 
 import android.util.Log
+import com.example.queuenow.BuildConfig
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.RequestOptions
 import com.google.ai.client.generativeai.type.content
@@ -10,7 +11,7 @@ import kotlinx.coroutines.withContext
 
 class AiRepository {
 
-    private val apiKey = "AIzaSyDpqCw98b5EgxvWPB7MW_9tW10SdOEVGXA"
+    private val apiKey = BuildConfig.GEMINI_API_KEY
 
     private val model = GenerativeModel(
         modelName = "gemini-2.5-flash",
