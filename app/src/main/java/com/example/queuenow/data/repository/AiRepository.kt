@@ -3,10 +3,12 @@ package com.example.queuenow.data.repository
 import android.util.Log
 import com.example.queuenow.BuildConfig
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.QuotaExceededException
 import com.google.ai.client.generativeai.type.RequestOptions
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 class AiRepository {
@@ -15,84 +17,133 @@ class AiRepository {
 
     private val model = GenerativeModel(
         modelName = "gemini-2.5-flash",
-        apiKey    = apiKey.trim(),
+        apiKey = apiKey.trim(),
+
         generationConfig = generationConfig {
-            temperature     = 0.15f
-            topK            = 40
-            topP            = 0.95f
-            maxOutputTokens = 2048
+            temperature = 0.15f
+            topK = 40
+            topP = 0.95f
+            maxOutputTokens = 512
         },
-        requestOptions    = RequestOptions(apiVersion = "v1beta"),
+
+        requestOptions = RequestOptions(
+            apiVersion = "v1beta"
+        ),
+
         systemInstruction = content {
             text(
                 """
-                Bạn là QueueBot – Trợ lý AI chính thức của ứng dụng QueueNow.
-                Nhiệm vụ: Dựa trên dữ liệu hàng đợi thực tế được cung cấp để trả lời khách hàng chính xác, ngắn gọn.
-                Nếu dữ liệu không đủ để trả lời, hãy hướng khách liên hệ trực tiếp với nhân viên.
-                Phong cách: Chuyên nghiệp, lịch sự, thân thiện. Luôn tự xưng là QueueBot.
-                Ngôn ngữ: Trả lời cùng ngôn ngữ mà khách hàng sử dụng.
+                Bạn là QueueBot – Trợ lý AI chính thức của QueueNow.
+
+                QUY TẮC:
+                - Chỉ được trả lời dựa trên dữ liệu hệ thống được cung cấp.
+                - Không suy đoán.
+                - Không tự tạo dữ liệu.
+                - Nếu dữ liệu không đủ hãy nói rõ và hướng người dùng liên hệ nhân viên.
+
+                PHONG CÁCH:
+                - Chuyên nghiệp
+                - Lịch sự
+                - Thân thiện
+                - Trả lời ngắn gọn
+                - Luôn tự xưng là QueueBot
+
+                NGÔN NGỮ:
+                - Trả lời cùng ngôn ngữ người dùng sử dụng.
                 """.trimIndent()
             )
         }
     )
 
-    suspend fun getAiResponse(prompt: String, contextData: String): String =
-        withContext(Dispatchers.IO) {
+    suspend fun getAiResponse(
+        prompt: String,
+        contextData: String
+    ): String = withContext(Dispatchers.IO) {
+
+        val fullPrompt = """
+            DỮ LIỆU HỆ THỐNG QUEUENOW (nguồn chính thức):
+
+            $contextData
+
+            Chỉ dùng dữ liệu trên để trả lời.
+
+            CÂU HỎI KHÁCH:
+            $prompt
+        """.trimIndent()
+
+        try {
+
+            val response = model.generateContent(fullPrompt)
+
+            response.text?.trim()
+                ?: "QueueBot chưa có phản hồi cho câu hỏi này."
+
+        }
+
+        // ───── QUOTA / RATE LIMIT ─────
+        catch (e: QuotaExceededException) {
+
+            Log.e("AiRepository", "Quota exceeded", e)
+
             try {
-                val fullPrompt = """
-                    DỮ LIỆU HÀNG ĐỢI HIỆN TẠI:
-                    $contextData
 
-                    CÂU HỎI CỦA KHÁCH: $prompt
-                """.trimIndent()
+                delay(30000)
 
-                val response = model.generateContent(fullPrompt)
-                response.text?.trim() ?: "QueueBot chưa có phản hồi cho câu hỏi này."
+                val retry = model.generateContent(fullPrompt)
 
-            } catch (e: Exception) {
-                // ── LOG ĐẦY ĐỦ để debug ──────────────────────────────────────
-                val errorClass   = e.javaClass.simpleName
-                val errorMsg     = e.localizedMessage ?: e.message ?: "null"
-                val causeMsg     = e.cause?.localizedMessage ?: "null"
-                Log.e("AiRepository", "=== GEMINI ERROR ===")
-                Log.e("AiRepository", "Class  : $errorClass")
-                Log.e("AiRepository", "Message: $errorMsg")
-                Log.e("AiRepository", "Cause  : $causeMsg")
-                Log.e("AiRepository", "Full   : ${e.stackTraceToString()}")
-                // ─────────────────────────────────────────────────────────────
+                retry.text?.trim()
+                    ?: "QueueBot chưa có phản hồi."
 
-                when {
-                    // Rate limit
-                    errorMsg.contains("429") || errorMsg.contains("quota", ignoreCase = true) ->
-                        "Hệ thống đang bận, vui lòng thử lại sau vài giây."
+            } catch (ex: Exception) {
 
-                    // Model không tìm thấy
-                    errorMsg.contains("404") || errorMsg.contains("not found", ignoreCase = true) ->
-                        "❌ [DEBUG] Model không tìm thấy. Class=$errorClass | $errorMsg"
+                Log.e("AiRepository", "Retry failed", ex)
 
-                    // Auth / API key
-                    errorMsg.contains("403")
-                            || errorMsg.contains("401")
-                            || errorMsg.contains("API_KEY", ignoreCase = true)
-                            || errorMsg.contains("api key", ignoreCase = true)
-                            || errorMsg.contains("PERMISSION", ignoreCase = true)
-                            || errorMsg.contains("invalid", ignoreCase = true) ->
-                        "❌ [DEBUG] Auth lỗi. Class=$errorClass | $errorMsg"
-
-                    // Mạng
-                    errorMsg.contains("Unable to resolve host", ignoreCase = true)
-                            || errorMsg.contains("timeout", ignoreCase = true)
-                            || errorMsg.contains("SocketException", ignoreCase = true) ->
-                        "❌ [DEBUG] Lỗi mạng. Class=$errorClass | $errorMsg"
-
-                    // Service unavailable
-                    errorMsg.contains("503") || errorMsg.contains("unavailable", ignoreCase = true) ->
-                        "Dịch vụ Gemini tạm thời không khả dụng."
-
-                    // Catch-all – HIỆN LỖI THẬT để debug
-                    else ->
-                        "❌ [DEBUG] Class=$errorClass | $errorMsg | Cause=$causeMsg"
-                }
+                "QueueBot đang bận do quá nhiều yêu cầu. Vui lòng thử lại sau."
             }
         }
+
+        // ───── CATCH ALL ─────
+        catch (e: Exception) {
+
+            val errorClass = e.javaClass.simpleName
+            val errorMsg = e.localizedMessage ?: e.message ?: "null"
+            val causeMsg = e.cause?.localizedMessage ?: "null"
+
+            Log.e("AiRepository", "=== GEMINI ERROR ===")
+            Log.e("AiRepository", "Class  : $errorClass")
+            Log.e("AiRepository", "Message: $errorMsg")
+            Log.e("AiRepository", "Cause  : $causeMsg")
+            Log.e("AiRepository", e.stackTraceToString())
+
+            when {
+
+                // Model not found
+                errorMsg.contains("404")
+                        || errorMsg.contains("not found", true) ->
+                    "QueueBot hiện chưa khả dụng."
+
+                // Auth / API key
+                errorMsg.contains("401")
+                        || errorMsg.contains("403")
+                        || errorMsg.contains("api key", true)
+                        || errorMsg.contains("permission", true)
+                        || errorMsg.contains("invalid", true) ->
+                    "QueueBot đang gặp lỗi xác thực."
+
+                // Network
+                errorMsg.contains("Unable to resolve host", true)
+                        || errorMsg.contains("timeout", true)
+                        || errorMsg.contains("SocketException", true) ->
+                    "Không thể kết nối mạng. Vui lòng kiểm tra Internet."
+
+                // Service unavailable
+                errorMsg.contains("503")
+                        || errorMsg.contains("unavailable", true) ->
+                    "Dịch vụ AI tạm thời không khả dụng."
+
+                else ->
+                    "QueueBot đang gặp sự cố tạm thời."
+            }
+        }
+    }
 }

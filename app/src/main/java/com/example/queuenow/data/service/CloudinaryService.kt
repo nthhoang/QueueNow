@@ -14,7 +14,7 @@ object CloudinaryService {
 
     private var initialized = false
 
-    fun init(context: Context) {
+    fun  init(context: Context) {
         if (initialized) return
         val config = mapOf(
             "cloud_name" to Constants.CLOUDINARY_CLOUD_NAME,
