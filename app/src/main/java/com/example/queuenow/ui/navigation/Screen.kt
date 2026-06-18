@@ -3,6 +3,7 @@ package com.example.queuenow.ui.navigation
 sealed class Screen(val route: String) {
     object Login    : Screen("login")
     object Register : Screen("register")
+    object ForgotPassword : Screen("forgot_password")
 
     object Home    : Screen("home")
     object PlaceDetail : Screen("place_detail/{placeId}") {
@@ -22,16 +23,12 @@ sealed class Screen(val route: String) {
     }
 
     // ── Chat ─────────────────────────────────────────────────────────────────
-    /** Màn hình chat với 1 người (user ↔ owner) */
     object ChatScreen : Screen("chat/{chatRoomId}") {
         fun createRoute(chatRoomId: String) = "chat/$chatRoomId"
     }
-    /** Danh sách hội thoại của user */
     object UserChatList : Screen("user_chat_list")
-    /** Danh sách hội thoại của owner */
     object OwnerChatList : Screen("owner_chat_list")
     
-    /** Chatbot AI trợ giúp thông tin */
     object AiChat : Screen("ai_chat/{placeId}") {
         fun createRoute(placeId: String) = "ai_chat/$placeId"
     }
@@ -63,16 +60,17 @@ sealed class Screen(val route: String) {
     object ManageAccounts    : Screen("manage_accounts")
     object ManagePlacesAdmin : Screen("manage_places_admin")
     object OwnerRequestList  : Screen("owner_request_list")
+    object ManageReviewsAdmin : Screen("manage_reviews_admin")
+    object ManagePaymentsAdmin : Screen("manage_payments_admin")
+    object ManageTicketsAdmin  : Screen("manage_tickets_admin")
 
     // ── Shared ────────────────────────────────────────────────────────────────
     object Notifications : Screen("notifications")
 
-    /** Màn hình quét QR check-in (user) */
     object QrScan : Screen("qr_scan/{placeId}/{roomId}") {
         fun createRoute(placeId: String, roomId: String) = "qr_scan/$placeId/$roomId"
     }
 
-    /** Màn hình xem QR của địa điểm (owner) */
     object PlaceQr : Screen("place_qr/{placeId}") {
         fun createRoute(placeId: String) = "place_qr/$placeId"
     }

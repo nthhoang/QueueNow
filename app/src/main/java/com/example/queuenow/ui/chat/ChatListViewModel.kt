@@ -12,7 +12,8 @@ data class ChatListUiState(
     val isLoading: Boolean = true,
     val chatRooms: List<ChatRoom> = emptyList(),
     val isOwnerMode: Boolean = false,
-    val currentUserId: String = ""
+    val currentUserId: String = "",
+    val error: String? = null
 )
 
 class ChatListViewModel(private val isOwnerMode: Boolean) : ViewModel() {
@@ -32,40 +33,60 @@ class ChatListViewModel(private val isOwnerMode: Boolean) : ViewModel() {
     }
 
     private val chatRepo = ChatRepository()
+    private val auth = FirebaseAuth.getInstance()
 
     private val _state = MutableStateFlow(ChatListUiState(isOwnerMode = isOwnerMode))
     val state = _state.asStateFlow()
 
     private var job: Job? = null
 
-    init { load() }
+    init {
+        observeAuthState()
+    }
 
-    private fun load() {
-        job?.cancel()
-        job = viewModelScope.launch {
-            // Chờ Auth
-            var uid: String? = null
-            withTimeoutOrNull(5_000L) {
-                while (uid == null) {
-                    uid = FirebaseAuth.getInstance().currentUser?.uid
-                    if (uid == null) delay(300L)
+    private fun observeAuthState() {
+        viewModelScope.launch {
+            // Lấy UID ngay lập tức nếu có, hoặc chờ session được khôi phục
+            var uid = auth.currentUser?.uid
+            
+            if (uid == null) {
+                // Chờ tối đa 5s để Firebase khôi phục session
+                withTimeoutOrNull(5000L) {
+                    while (uid == null) {
+                        uid = auth.currentUser?.uid
+                        if (uid == null) delay(500)
+                    }
                 }
             }
-            val userId = uid ?: run {
-                _state.update { it.copy(isLoading = false) }
-                return@launch
-            }
-            _state.update { it.copy(currentUserId = userId) }
 
+            if (uid != null) {
+                _state.update { it.copy(currentUserId = uid!!, error = null) }
+                loadChatRooms(uid!!)
+            } else {
+                _state.update { it.copy(isLoading = false, error = "Vui lòng đăng nhập lại") }
+            }
+        }
+    }
+
+    private fun loadChatRooms(userId: String) {
+        job?.cancel()
+        job = viewModelScope.launch {
             val flow = if (isOwnerMode)
                 chatRepo.getChatRoomsForOwner(userId)
             else
                 chatRepo.getChatRoomsForUser(userId)
 
-            flow.collect { rooms ->
+            flow.catch { e ->
+                _state.update { it.copy(isLoading = false, error = e.message) }
+            }.collect { rooms ->
                 _state.update { it.copy(chatRooms = rooms, isLoading = false) }
             }
         }
+    }
+
+    fun retry() {
+        _state.update { it.copy(isLoading = true, error = null) }
+        observeAuthState()
     }
 
     override fun onCleared() {

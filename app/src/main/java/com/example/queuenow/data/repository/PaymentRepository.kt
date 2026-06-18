@@ -25,6 +25,18 @@ class PaymentRepository {
             .toObjects(Payment::class.java)
             .firstOrNull()
 
+    fun getAllPayments(): Flow<List<Payment>> = callbackFlow {
+        val listener = col.addSnapshotListener { snap, error ->
+            if (error != null) {
+                Log.e("PaymentRepo", "getAllPayments error: ${error.message}")
+                trySend(emptyList())
+                return@addSnapshotListener
+            }
+            trySend(snap?.toObjects(Payment::class.java) ?: emptyList())
+        }
+        awaitClose { listener.remove() }
+    }
+
     /**
      * Owner: lấy payments SUBMITTED của địa điểm — filter in-memory tránh composite index
      */

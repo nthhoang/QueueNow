@@ -30,8 +30,9 @@ fun AppNavGraph(
     NavHost(navController = navController, startDestination = startDestination) {
 
         // ── Auth ──────────────────────────────────────────────────────────────
-        composable(Screen.Login.route)    { LoginScreen(navController) }
-        composable(Screen.Register.route) { RegisterScreen(navController) }
+        composable(Screen.Login.route)          { LoginScreen(navController) }
+        composable(Screen.Register.route)       { RegisterScreen(navController) }
+        composable(Screen.ForgotPassword.route) { ForgotPasswordScreen(navController) }
 
         // ── User ──────────────────────────────────────────────────────────────
         composable(Screen.Home.route)         { HomeScreen(navController) }
@@ -136,6 +137,7 @@ fun AppNavGraph(
         composable(Screen.ManageAccounts.route)    { ManageAccountsScreen(navController) }
         composable(Screen.ManagePlacesAdmin.route) { ManagePlacesAdminScreen(navController) }
         composable(Screen.OwnerRequestList.route)  { OwnerRequestListScreen(navController) }
+        composable(Screen.ManageReviewsAdmin.route){ ManageReviewsAdminScreen(navController) }
 
         // ── Shared ────────────────────────────────────────────────────────────
         composable(Screen.Notifications.route) { NotificationScreen(navController) }

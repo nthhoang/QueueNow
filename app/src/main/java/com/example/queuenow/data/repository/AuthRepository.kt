@@ -78,6 +78,19 @@ class AuthRepository {
         account
     }
 
+    suspend fun forgotPassword(email: String): Result<Unit> = runCatching {
+        try {
+            auth.sendPasswordResetEmail(email).await()
+        } catch (e: Exception) {
+            val msg = when {
+                e.message?.contains("user-not-found") == true -> "Không tìm thấy người dùng với email này"
+                e.message?.contains("invalid-email") == true  -> "Email không hợp lệ"
+                else                                          -> "Không thể gửi email đặt lại mật khẩu: ${e.message}"
+            }
+            throw Exception(msg)
+        }
+    }
+
     suspend fun getAccount(uid: String): Account? =
         db.collection("accounts").document(uid).get().await()
             .toObject(Account::class.java)

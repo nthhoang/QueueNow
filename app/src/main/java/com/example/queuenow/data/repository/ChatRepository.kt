@@ -50,7 +50,8 @@ class ChatRepository {
                 userName      = userName,
                 ownerId       = ownerId,
                 ownerName     = ownerName,
-                createdAt     = System.currentTimeMillis()
+                createdAt     = System.currentTimeMillis(),
+                lastMessageTime = System.currentTimeMillis() // Khởi tạo để không bị filter mất
             )
             docRef.set(room).await()
             room
@@ -114,11 +115,10 @@ class ChatRepository {
             .addSnapshotListener { snap, error ->
                 if (error != null) {
                     Log.e("ChatRepo", "getChatRoomsForUser: ${error.message}")
-                    trySend(emptyList())
+                    close(error)
                     return@addSnapshotListener
                 }
                 val list = snap?.toObjects(ChatRoom::class.java)
-                    ?.filter { it.lastMessageTime > 0 }
                     ?.sortedByDescending { it.lastMessageTime }
                     ?: emptyList()
                 trySend(list)
@@ -133,11 +133,10 @@ class ChatRepository {
             .addSnapshotListener { snap, error ->
                 if (error != null) {
                     Log.e("ChatRepo", "getChatRoomsForOwner: ${error.message}")
-                    trySend(emptyList())
+                    close(error)
                     return@addSnapshotListener
                 }
                 val list = snap?.toObjects(ChatRoom::class.java)
-                    ?.filter { it.lastMessageTime > 0 }
                     ?.sortedByDescending { it.lastMessageTime }
                     ?: emptyList()
                 trySend(list)

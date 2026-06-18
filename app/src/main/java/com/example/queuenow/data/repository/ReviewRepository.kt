@@ -12,6 +12,17 @@ class ReviewRepository {
     private val db  = FirebaseFirestore.getInstance()
     private val col = db.collection("reviews")
 
+    fun getAllReviews(): Flow<List<Review>> = callbackFlow {
+        val listener = col.addSnapshotListener { snap, error ->
+            if (error != null) {
+                Log.e("ReviewRepo", "getAllReviews: ${error.message}")
+                trySend(emptyList()); return@addSnapshotListener
+            }
+            trySend(snap?.toObjects(Review::class.java) ?: emptyList())
+        }
+        awaitClose { listener.remove() }
+    }
+
     fun getReviewsByPlace(placeId: String): Flow<List<Review>> = callbackFlow {
         val listener = col
             .whereEqualTo("placeId", placeId)
@@ -42,6 +53,10 @@ class ReviewRepository {
         col.document(reviewId).update(
             mapOf("reply" to reply, "replyAt" to System.currentTimeMillis())
         ).await()
+    }
+
+    suspend fun deleteReview(reviewId: String) {
+        col.document(reviewId).delete().await()
     }
 
     /** Tính rating trung bình và tổng số đánh giá, trả về Pair(avg, count) */

@@ -21,11 +21,17 @@ class QueueTicketRepository {
         TicketStatus.CALLED.name,
         TicketStatus.SKIPPED.name
     )
-    private val inQueueStatuses = setOf(
-        TicketStatus.WAITING.name,
-        TicketStatus.CALLED.name,
-        TicketStatus.SKIPPED.name
-    )
+
+    fun getAllTickets(): Flow<List<QueueTicket>> = callbackFlow {
+        val listener = col.addSnapshotListener { snap, error ->
+            if (error != null) {
+                Log.e("TicketRepo", "getAllTickets: ${error.message}")
+                trySend(emptyList()); return@addSnapshotListener
+            }
+            trySend(snap?.toObjects(QueueTicket::class.java) ?: emptyList())
+        }
+        awaitClose { listener.remove() }
+    }
 
     suspend fun getUserActiveTicketInRoom(userId: String, roomId: String): QueueTicket? {
         val today = today()

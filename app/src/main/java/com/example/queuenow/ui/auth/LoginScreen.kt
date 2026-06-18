@@ -1,5 +1,8 @@
 package com.example.queuenow.ui.auth
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -71,43 +74,76 @@ fun LoginScreen(navController: NavController, vm: AuthViewModel = viewModel()) {
             ) {
                 Spacer(Modifier.height(80.dp))
 
-                // Logo
+                // Logo Animation or Static
                 Box(
                     modifier = Modifier
-                        .size(90.dp)
-                        .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(28.dp)),
+                        .size(100.dp)
+                        .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(30.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.QueuePlayNext, null,
-                        tint = Color.White, modifier = Modifier.size(50.dp))
+                    Icon(
+                        Icons.Filled.QueuePlayNext, 
+                        contentDescription = null,
+                        tint = Color.White, 
+                        modifier = Modifier.size(60.dp)
+                    )
                 }
-                Spacer(Modifier.height(16.dp))
-                Text("QueueNow", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Đặt số thứ tự thông minh", color = Color.White.copy(0.8f))
+                
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    "QueueNow", 
+                    fontSize = 36.sp, 
+                    fontWeight = FontWeight.ExtraBold, 
+                    color = Color.White,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    "Giải pháp xếp hàng thông minh", 
+                    color = Color.White.copy(0.85f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
 
-                Spacer(Modifier.height(40.dp))
+                Spacer(Modifier.height(48.dp))
 
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(32.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(8.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
                 ) {
-                    Column(modifier = Modifier.padding(28.dp)) {
-                        Text("Đăng nhập", style = MaterialTheme.typography.headlineMedium,
-                            color = OnBackground, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(24.dp))
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "Chào mừng trở lại", 
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = OnBackground, 
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Đăng nhập để tiếp tục sử dụng",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
+                        )
+                        
+                        Spacer(Modifier.height(32.dp))
 
                         QueueTextField(
-                            value = email, onValueChange = { email = it },
+                            value = email, 
+                            onValueChange = { email = it },
                             label = "Email",
                             leadingIcon = { Icon(Icons.Filled.Email, null, tint = Primary) }
                         )
-                        Spacer(Modifier.height(14.dp))
+                        
+                        Spacer(Modifier.height(16.dp))
+                        
                         QueueTextField(
-                            value = password, onValueChange = { password = it },
+                            value = password, 
+                            onValueChange = { password = it },
                             label = "Mật khẩu",
                             leadingIcon = { Icon(Icons.Filled.Lock, null, tint = Primary) },
                             trailingIcon = {
@@ -123,41 +159,70 @@ fun LoginScreen(navController: NavController, vm: AuthViewModel = viewModel()) {
                                 VisualTransformation.None else PasswordVisualTransformation()
                         )
 
-                        // Hiển thị lỗi inline (đặc biệt cho tài khoản bị khóa)
-                        if (state.error != null) {
-                            Spacer(Modifier.height(10.dp))
-                            val isLocked = state.error?.contains("bị khóa") == true
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isLocked) StatusCanceled.copy(0.1f)
-                                else StatusCanceled.copy(0.08f)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(10.dp),
-                                    verticalAlignment = Alignment.Top
+                        // Forgot Password Link
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                            TextButton(onClick = { navController.navigate(Screen.ForgotPassword.route) }) {
+                                Text(
+                                    "Quên mật khẩu?", 
+                                    color = Primary, 
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        // Hiển thị lỗi inline nếu có
+                        AnimatedVisibility(
+                            visible = state.error != null,
+                            enter = fadeIn(),
+                            exit = fadeOut()
+                        ) {
+                            state.error?.let { err ->
+                                Surface(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = StatusCanceled.copy(0.1f)
                                 ) {
-                                    Icon(
-                                        if (isLocked) Icons.Filled.Lock else Icons.Filled.Error,
-                                        null, tint = StatusCanceled,
-                                        modifier = Modifier.size(16.dp).padding(top = 2.dp)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(state.error!!, style = MaterialTheme.typography.bodySmall,
-                                        color = StatusCanceled)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Filled.Error, null, tint = StatusCanceled, modifier = Modifier.size(20.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(err, style = MaterialTheme.typography.bodySmall, color = StatusCanceled)
+                                    }
                                 }
                             }
                         }
 
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(16.dp))
 
                         GradientButton(
-                            text = if (state.isLoading) "Đang đăng nhập..." else "Đăng nhập",
+                            text = if (state.isLoading) "Đang xác thực..." else "Đăng nhập",
                             onClick = { vm.login(email, password) },
                             enabled = !state.isLoading && email.isNotEmpty() && password.isNotEmpty(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().height(56.dp)
                         )
 
+                        Spacer(Modifier.height(24.dp))
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Divider(modifier = Modifier.weight(1f), color = Color.LightGray.copy(0.5f))
+                            Text(
+                                " HOẶC ", 
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                            Divider(modifier = Modifier.weight(1f), color = Color.LightGray.copy(0.5f))
+                        }
+
                         Spacer(Modifier.height(16.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center,
@@ -165,12 +230,12 @@ fun LoginScreen(navController: NavController, vm: AuthViewModel = viewModel()) {
                         ) {
                             Text("Chưa có tài khoản?", color = TextSecondary)
                             TextButton(onClick = { navController.navigate(Screen.Register.route) }) {
-                                Text("Đăng ký", color = Primary, fontWeight = FontWeight.Bold)
+                                Text("Đăng ký ngay", color = Primary, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(40.dp))
             }
         }
     }

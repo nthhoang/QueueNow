@@ -6,13 +6,15 @@ import com.example.queuenow.data.model.Account
 import com.example.queuenow.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AuthState(
     val isLoading: Boolean = false,
     val account: Account? = null,
     val error: String? = null,
-    val isSuccess: Boolean = false
+    val isSuccess: Boolean = false,
+    val message: String? = null
 )
 
 class AuthViewModel : ViewModel() {
@@ -48,5 +50,24 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    fun clearError() { _state.value = _state.value.copy(error = null) }
+    fun forgotPassword(email: String) {
+        if (email.isBlank()) {
+            _state.update { it.copy(error = "Vui lòng nhập email") }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null, message = null) }
+            repo.forgotPassword(email.trim()).fold(
+                onSuccess = {
+                    _state.update { it.copy(isLoading = false, message = "Link đặt lại mật khẩu đã được gửi về email của bạn") }
+                },
+                onFailure = {
+                    _state.update { it.copy(isLoading = false, error = it.message ?: "Có lỗi xảy ra") }
+                }
+            )
+        }
+    }
+
+    fun clearError() { _state.update { it.copy(error = null) } }
+    fun clearMessage() { _state.update { it.copy(message = null) } }
 }
